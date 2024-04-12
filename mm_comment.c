@@ -125,10 +125,13 @@ void *mm_malloc(size_t size)
 /*
  * mm_free - Freeing a block does nothing.
  */
-void mm_free(void *ptr)
-{
+void mm_free(void *bp){ 
+    // 어느 시점에 있는 bp를 인자로 받는다.
+    size_t size = GET_SIZE(HDRP(bp)); // 얼만큼 free를 해야 하는지.
+    PUT(HDRP(bp),PACK(size,0)); // header, footer 들을 free 시킨다. 안에 들어있는걸 지우는게 아니라 가용상태로 만들어버린다.
+    PUT(FTRP(bp), PACK(size,0)); 
+    coalesce(bp);
 }
-
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
