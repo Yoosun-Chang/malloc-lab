@@ -54,7 +54,7 @@ team_t team = {
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE))) 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
-
+static void *extend_heap(size_t words);
 /* 
  * mm_init - initialize the malloc package.
  * 최초의 가용블록(4words)을 가지고 힙을 생성하고 할당기를 초기화한다. 
@@ -73,6 +73,22 @@ int mm_init(void)
     if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
         return -1;
     return 0;
+}
+
+/* 요청받은 words만큼 추가 메모리를 요청한다.*/
+static void *extend_heap(size_t words)
+{
+    char *bp;
+
+    size_t size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE; 
+    if ((long)(bp = mem_sbrk(size)) == -1) 
+        return NULL;
+
+    PUT(HDRP(bp), PACK(size, 0));         
+    PUT(FTRP(bp), PACK(size, 0));         
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); 
+
+    return coalesce(bp); 
 }
 
 /* 

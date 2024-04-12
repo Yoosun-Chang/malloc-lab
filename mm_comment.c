@@ -77,7 +77,7 @@ int mm_init(void){ // 처음에 heap을 시작할 때 0부터 시작. 완전 처
     // 할당을(1) 할건데 8만큼 줄거다(DSIZE). -> 1 WSIZE 늘어난 시점부터 PACK에서 나온 사이즈를 줄거다.)
     PUT(heap_listp + (2*WSIZE), PACK(DSIZE,1)); // prologue footer생성.
     PUT(heap_listp + (3*WSIZE), PACK(0,1)); // epilogue block header를 처음에 만든다. 그리고 뒤로 밀리는 형태.
-    // heap_listp+= (2*WSIZE); // prologue header와 footer 사이로 포인터로 옮긴다. header 뒤 위치. 다른 블록 가거나 그러려고.
+    heap_listp+= (2*WSIZE); // prologue header와 footer 사이로 포인터로 옮긴다. header 뒤 위치. 다른 블록 가거나 그러려고.
 
     if (extend_heap(CHUNKSIZE/WSIZE)==NULL)
         return -1;
