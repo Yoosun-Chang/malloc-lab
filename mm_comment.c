@@ -36,14 +36,14 @@ team_t team = {
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 
-/* 기본 상수와 매크로 */
+/* 기본 상수  */
 #define WSIZE 4             // word size
 #define DSIZE 8             // double word size
 #define CHUNKSIZE (1 << 12) // 힙 확장을 위한 기본 크기 (= 초기 빈 블록의 크기, 4kb)
 
+/* 매크로 */
 #define MAX(x, y) ((x) > (y) ? (x) : (y)) // x,y 중 큰 값
 
-/* 가용 리스트에 접근하고 방문하는 작은 매크로들 */
 #define PACK(size, alloc) ((size) | (alloc)) // 크기와 할당 비트를 통합 -> 헤더와 푸터에 저장
 // alloc : 가용여부 (ex. 000) / size : block size를 의미. =>합치면 온전한 주소가 나온다.
 
@@ -62,12 +62,48 @@ team_t team = {
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
+static void *extend_heap(size_t words);
 /* 
  * mm_init - initialize the malloc package.
  */
-int mm_init(void)
-{
+int mm_init(void){ // 처음에 heap을 시작할 때 0부터 시작. 완전 처음.(start of heap)
+    /* create 초기 빈 heap*/
+    char *heap_listp;
+    if ((heap_listp = mem_sbrk(4*WSIZE)) == (void*)-1){ // old brk에서 4만큼 늘려서 mem brk로 늘림.
+        return -1;
+    }
+    PUT(heap_listp,0); // 블록생성시 넣는 padding을 한 워드 크기만큼 생성. heap_listp 위치는 맨 처음.
+    PUT(heap_listp + (1*WSIZE), PACK(DSIZE,1)); // prologue header 생성. pack을 해석하면, 
+    // 할당을(1) 할건데 8만큼 줄거다(DSIZE). -> 1 WSIZE 늘어난 시점부터 PACK에서 나온 사이즈를 줄거다.)
+    PUT(heap_listp + (2*WSIZE), PACK(DSIZE,1)); // prologue footer생성.
+    PUT(heap_listp + (3*WSIZE), PACK(0,1)); // epilogue block header를 처음에 만든다. 그리고 뒤로 밀리는 형태.
+    // heap_listp+= (2*WSIZE); // prologue header와 footer 사이로 포인터로 옮긴다. header 뒤 위치. 다른 블록 가거나 그러려고.
+
+    if (extend_heap(CHUNKSIZE/WSIZE)==NULL)
+        return -1;
+    // 주어진 워드 수(CHUNKSIZE/WSIZE) 만큼 힙을 확장하고, 성공하면 확장된 힙의 시작 주소를 반환한다. 
+    // 만약 확장이 실패하면 NULL을 반환한다.
     return 0;
+}
+
+static void *extend_heap(size_t words)
+{
+    char *bp; // 블록 포인터
+    size_t size;
+
+    // 더블 워드 정렬 제한 조건을 적용하기 위해 반드시 짝수 사이즈(8byte)의 메모리만 할당한다.(반올림)
+    size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE;
+    bp = mem_sbrk(size); // mem_sbrk return : 이전 brk(epilogue block 뒤 포인터) 반환
+    // ↳ 실제 brk : 확장 후 힙의 맨 끝 포인터
+
+    if ((long)bp ==  -1) // mem_sbrk err return
+        return NULL;
+
+    PUT(HDRP(bp), PACK(size, 0)); // size 만큼의 가용 블록의 헤더를 생성한다.
+    PUT(FTRP(bp), PACK(size, 0)); // size 만큼의 가용 블록의 푸터를 생성한다.
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); // 새로운 에필로그 헤더를 생성한다.
+
+    return coalesce(bp); // 이전 힙이 가용 블록이라면 연결 수행
 }
 
 /* 

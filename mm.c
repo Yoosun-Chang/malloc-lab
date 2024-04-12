@@ -54,11 +54,24 @@ team_t team = {
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE))) 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
+
 /* 
  * mm_init - initialize the malloc package.
+ * 최초의 가용블록(4words)을 가지고 힙을 생성하고 할당기를 초기화한다. 
  */
 int mm_init(void)
 {
+    char *heap_listp;
+
+    if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1) 
+        return -1;
+    PUT(heap_listp, 0);                            
+    PUT(heap_listp + (1 * WSIZE), PACK(DSIZE, 1)); 
+    PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1)); 
+    PUT(heap_listp + (3 * WSIZE), PACK(0, 1));    
+
+    if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
+        return -1;
     return 0;
 }
 
