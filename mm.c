@@ -55,6 +55,8 @@ team_t team = {
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 static void *extend_heap(size_t words);
+static void *coalesce(void *bp);
+
 /* 
  * mm_init - initialize the malloc package.
  * 최초의 가용블록(4words)을 가지고 힙을 생성하고 할당기를 초기화한다. 
@@ -109,9 +111,55 @@ void *mm_malloc(size_t size)
 
 /*
  * mm_free - Freeing a block does nothing.
+ * 요청한 블록을 반환한다.
  */
-void mm_free(void *ptr)
+void mm_free(void *bp){ 
+    size_t size = GET_SIZE(HDRP(bp)); 
+    PUT(HDRP(bp),PACK(size,0)); 
+    PUT(FTRP(bp), PACK(size,0)); 
+    coalesce(bp);
+}
+
+/* 인접 가용 블록들을 경계 태그 연결 기술을 사용하여 연결한다. */
+static void *coalesce(void *bp)
 {
+    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp))); 
+    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp))); 
+    size_t size = GET_SIZE(HDRP(bp)); 
+
+    // @pb : 이전 블록, @cb : 현재 블록, @nb : 다음 블록
+    // [CASE 1] : pb, nb - 둘 다 할당 상태
+    if (prev_alloc && next_alloc)
+    {
+        return bp;
+    }
+    // [CASE 2] : pb - 할당 상태 / nb - 가용 상태
+    // resize block size : cb + nb
+    else if (prev_alloc && !next_alloc)
+    {
+        size += GET_SIZE(HDRP(NEXT_BLKP(bp))); // 현재 블록 사이즈에 다음 블록 사이즈 더함
+        PUT(HDRP(bp), PACK(size, 0));
+        PUT(FTRP(bp), PACK(size, 0));
+    }
+    // [CASE 3] : pb - 가용 상태 / nb - 할당 상태
+    // resize block size : pb + cb
+    else if (!prev_alloc && next_alloc)
+    {
+        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+        PUT(FTRP(bp), PACK(size, 0));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        bp = PREV_BLKP(bp);
+    }
+    // [CASE 4] : pb - 가용 상태 / nb - 가용 상태
+    // resize block size : pb + nb
+    else {
+        size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
+            GET_SIZE(FTRP(NEXT_BLKP(bp)));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+        bp = PREV_BLKP(bp);
+    }
+    return bp;
 }
 
 /*

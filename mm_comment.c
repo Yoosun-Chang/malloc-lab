@@ -63,6 +63,8 @@ team_t team = {
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 static void *extend_heap(size_t words);
+static void *coalesce(void *bp);
+
 /* 
  * mm_init - initialize the malloc package.
  */
@@ -125,8 +127,57 @@ void *mm_malloc(size_t size)
 /*
  * mm_free - Freeing a block does nothing.
  */
-void mm_free(void *ptr)
+void mm_free(void *bp){ 
+    // 어느 시점에 있는 bp를 인자로 받는다.
+    size_t size = GET_SIZE(HDRP(bp)); // 얼만큼 free를 해야 하는지.
+    PUT(HDRP(bp),PACK(size,0)); // header, footer 들을 free 시킨다. 안에 들어있는걸 지우는게 아니라 가용상태로 만들어버린다.
+    PUT(FTRP(bp), PACK(size,0)); 
+    coalesce(bp);
+}
+
+static void *coalesce(void *bp)
 {
+    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp))); // 이전 블록 푸터에서 할당 여부 파악
+    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp))); // 다음 블록 헤더에서 할당 여부 파악
+    size_t size = GET_SIZE(HDRP(bp)); // (할당 비트를 제외한) 블록 사이즈
+
+    // @pb : 이전 블록, @cb : 현재 블록, @nb : 다음 블록
+    // [CASE 1] : pb, nb - 둘 다 할당 상태
+    if (prev_alloc && next_alloc)
+    {
+        return bp;
+    }
+    // [CASE 2] : pb - 할당 상태 / nb - 가용 상태
+    // resize block size : cb + nb
+    else if (prev_alloc && !next_alloc)
+    {
+        size += GET_SIZE(HDRP(NEXT_BLKP(bp))); // 현재 블록 사이즈에 다음 블록 사이즈 더함
+        PUT(HDRP(bp), PACK(size, 0));
+        PUT(FTRP(bp), PACK(size, 0));
+    }
+    // [CASE 3] : pb - 가용 상태 / nb - 할당 상태
+    // resize block size : pb + cb
+    else if (!prev_alloc && next_alloc)
+    {
+        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+        PUT(FTRP(bp), PACK(size, 0));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        bp = PREV_BLKP(bp);
+    }
+    // [CASE 4] : pb - 가용 상태 / nb - 가용 상태
+    // resize block size : pb + nb
+    else {
+        size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
+            GET_SIZE(FTRP(NEXT_BLKP(bp)));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+        bp = PREV_BLKP(bp);
+    }
+    // next_heap_listp가 속해있는 블록이 이전 블록과 합쳐진다면
+    // next_heap_listp에 해당하는 블록을 찾아갈 수 없으므로
+    // 새로 next_heap_listp를 이전 블록 위치로 지정해준다.
+    // next_heap_listp = bp;
+    return bp;
 }
 
 /*
