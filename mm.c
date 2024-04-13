@@ -189,7 +189,6 @@ static void *next_fit(size_t asize)
 {
     char *bp;
 
-    // next_fit 포인터에서 탐색을 시작한다.
     for (bp = NEXT_BLKP(next_heap_listp); GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp))))
             return bp;
@@ -199,6 +198,20 @@ static void *next_fit(size_t asize)
             return bp;
 
     return NULL;
+}
+
+/* best-fit 방식으로 가용 블록을 탐색한다. */
+static void *best_fit(size_t asize)
+{
+    void *bp;
+    void *best_fit = NULL;
+
+    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp))))
+            if (!best_fit || GET_SIZE(HDRP(bp)) < GET_SIZE(HDRP(best_fit)))
+                best_fit = bp;
+
+    return best_fit;
 }
 
 /* 찾은 가용 블록에 대해 할당 블록과 가용 블록으로 분할한다. */
