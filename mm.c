@@ -56,6 +56,11 @@ team_t team = {
 
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
+static void *first_fit(size_t asize);
+
+static char *heap_listp;  
+static char *next_heap_listp;
+
 
 /* 
  * mm_init - initialize the malloc package.
@@ -63,14 +68,15 @@ static void *coalesce(void *bp);
  */
 int mm_init(void)
 {
-    char *heap_listp;
-
     if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1) 
         return -1;
     PUT(heap_listp, 0);                            
     PUT(heap_listp + (1 * WSIZE), PACK(DSIZE, 1)); 
     PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1)); 
     PUT(heap_listp + (3 * WSIZE), PACK(0, 1));    
+    
+    heap_listp+= (2*WSIZE);
+    next_heap_listp = heap_listp;
 
     if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
         return -1;
@@ -89,7 +95,7 @@ static void *extend_heap(size_t words)
     PUT(HDRP(bp), PACK(size, 0));         
     PUT(FTRP(bp), PACK(size, 0));         
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); 
-
+    
     return coalesce(bp); 
 }
 
@@ -99,14 +105,43 @@ static void *extend_heap(size_t words)
  */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1)
-	return NULL;
-    else {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
+    size_t asize;
+    size_t extendsize;
+    char *bp;
+
+    if (size == 0) 
+        return NULL;
+
+    if (size <= DSIZE) 
+        asize = 2 * DSIZE;
+    else 
+        asize = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);
+
+    bp = next_fit(asize); // Choice fit-method : first_fit, next_fit, best_fit
+
+    if (bp != NULL) {
+        place(bp, asize); 
+        next_heap_listp = bp;
+        return bp; 
     }
+
+    extendsize = MAX(asize, CHUNKSIZE);
+    if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
+        return NULL;
+    place(bp, asize);
+    next_heap_listp = bp;
+    return bp;
+}
+
+static void *first_fit(size_t asize)
+{
+    void *bp;
+
+    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp))))
+            return bp;
+
+    return NULL;
 }
 
 /*
@@ -159,6 +194,7 @@ static void *coalesce(void *bp)
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
     }
+    next_heap_listp = bp; 
     return bp;
 }
 
