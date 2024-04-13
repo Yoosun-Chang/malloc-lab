@@ -184,6 +184,23 @@ static void *first_fit(size_t asize)
     return NULL;
 }
 
+/* next fit 방식으로 가용 블록을 탐색한다. */
+static void *next_fit(size_t asize)
+{
+    char *bp;
+
+    // next_fit 포인터에서 탐색을 시작한다.
+    for (bp = NEXT_BLKP(next_heap_listp); GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp))))
+            return bp;
+
+    for (bp = heap_listp; bp <= next_heap_listp; bp = NEXT_BLKP(bp))
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp))))
+            return bp;
+
+    return NULL;
+}
+
 /* 찾은 가용 블록에 대해 할당 블록과 가용 블록으로 분할한다. */
 static void place(void *bp, size_t asize)
 {
