@@ -101,7 +101,7 @@ static void *extend_heap(size_t words)
 
 /* 
  * mm_malloc - Allocate a block by incrementing the brk pointer.
- *     Always allocate a block whose size is a multiple of the alignment.
+ * 새 블록을 할당한다.
  */
 void *mm_malloc(size_t size)
 {
@@ -117,7 +117,7 @@ void *mm_malloc(size_t size)
     else 
         asize = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);
 
-    bp = next_fit(asize); // Choice fit-method : first_fit, next_fit, best_fit
+    bp = first_fit(asize); // Choice fit-method : first_fit, next_fit, best_fit
 
     if (bp != NULL) {
         place(bp, asize); 
@@ -133,6 +133,7 @@ void *mm_malloc(size_t size)
     return bp;
 }
 
+/* fist fit 방식으로 가용 블록을 탐색한다. */
 static void *first_fit(size_t asize)
 {
     void *bp;
