@@ -150,6 +150,9 @@ void *mm_realloc(void *ptr, size_t size)
     return newptr;
 }
 
+
+
+
 /** 서브 함수 **/
 
 /* 요청받은 words만큼 추가 메모리를 요청한다.*/
@@ -184,21 +187,19 @@ static void *first_fit(size_t asize)
 /* 찾은 가용 블록에 대해 할당 블록과 가용 블록으로 분할한다. */
 static void place(void *bp, size_t asize)
 {
-    size_t csize = GET_SIZE(HDRP(bp)); // 가용 블록의 사이즈
+    size_t csize = GET_SIZE(HDRP(bp));
 
     if ((csize - asize) >= (2 * DSIZE)) {
-        // asize만큼의 할당 블록을 생성한다.
         PUT(HDRP(bp), PACK(asize, 1));
         PUT(FTRP(bp), PACK(asize, 1));
         bp = NEXT_BLKP(bp);
-        next_heap_listp = bp; // 분할 이후 그 다음 블록
-        // 새로운 할당 블록(전체 가용 블록 - 할당 블록)의 뒷 부분을 가용 블록으로 만든다.
+        next_heap_listp = bp;
         PUT(HDRP(bp), PACK(csize - asize, 0));
         PUT(FTRP(bp), PACK(csize - asize, 0));
     } else {
         PUT(HDRP(bp), PACK(csize, 1));
         PUT(FTRP(bp), PACK(csize, 1));
-        next_heap_listp = NEXT_BLKP(bp); // 분할 이후 그 다음 블록
+        next_heap_listp = NEXT_BLKP(bp);
     }
 }
 
