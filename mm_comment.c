@@ -65,12 +65,14 @@ team_t team = {
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
 
+static char *heap_listp;  
+static char *next_heap_listp;
+
 /* 
  * mm_init - initialize the malloc package.
  */
 int mm_init(void){ // 처음에 heap을 시작할 때 0부터 시작. 완전 처음.(start of heap)
     /* create 초기 빈 heap*/
-    char *heap_listp;
     if ((heap_listp = mem_sbrk(4*WSIZE)) == (void*)-1){ // old brk에서 4만큼 늘려서 mem brk로 늘림.
         return -1;
     }
@@ -80,7 +82,7 @@ int mm_init(void){ // 처음에 heap을 시작할 때 0부터 시작. 완전 처
     PUT(heap_listp + (2*WSIZE), PACK(DSIZE,1)); // prologue footer생성.
     PUT(heap_listp + (3*WSIZE), PACK(0,1)); // epilogue block header를 처음에 만든다. 그리고 뒤로 밀리는 형태.
     heap_listp+= (2*WSIZE); // prologue header와 footer 사이로 포인터로 옮긴다. header 뒤 위치. 다른 블록 가거나 그러려고.
-
+    next_heap_listp = heap_listp;
     if (extend_heap(CHUNKSIZE/WSIZE)==NULL)
         return -1;
     // 주어진 워드 수(CHUNKSIZE/WSIZE) 만큼 힙을 확장하고, 성공하면 확장된 힙의 시작 주소를 반환한다. 
@@ -114,14 +116,35 @@ static void *extend_heap(size_t words)
  */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1)
-	return NULL;
-    else {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
+    size_t asize;
+    size_t extendsize;
+    char *bp;
+
+    if (size == 0) // 사이즈 0 요청 처리
+        return NULL;
+
+    // 더블 워드 정렬 제한 조건을 만족 시키기위해 더블 워드 단위로 크기를 설정한다.
+    if (size <= DSIZE) // 최소 크기인 16바이트(헤더, 푸터, 페이로드 포함)로 설정한다.
+        asize = 2 * DSIZE;
+    else // 8바이트를 넘는 요청 처리
+        asize = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);
+
+    // 조정한 크기(asize)에 대해 가용 리스트에서 적절한 가용 블록을 찾는다.
+    bp = next_fit(asize); // Choice fit-method : first_fit, next_fit, best_fit
+
+    if (bp != NULL) {
+        place(bp, asize); // 초과부분을 분할한다.
+        next_heap_listp = bp;
+        return bp; // 새롭게 할당한 블록을 리턴한다.
     }
+
+    // 적합한 fit 공간을 찾지 못했을 때 heap을 확장한다.
+    extendsize = MAX(asize, CHUNKSIZE);
+    if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
+        return NULL;
+    place(bp, asize);
+    next_heap_listp = bp;
+    return bp;
 }
 
 /*
