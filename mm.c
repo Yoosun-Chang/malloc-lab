@@ -54,6 +54,7 @@ team_t team = {
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE))) 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
+/* 전역 영역 선언 */
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
 static void *first_fit(size_t asize);
@@ -61,6 +62,7 @@ static void *first_fit(size_t asize);
 static char *heap_listp;  
 static char *next_heap_listp;
 
+/** 메인 함수 **/
 
 /* 
  * mm_init - initialize the malloc package.
@@ -81,22 +83,6 @@ int mm_init(void)
     if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
         return -1;
     return 0;
-}
-
-/* 요청받은 words만큼 추가 메모리를 요청한다.*/
-static void *extend_heap(size_t words)
-{
-    char *bp;
-
-    size_t size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE; 
-    if ((long)(bp = mem_sbrk(size)) == -1) 
-        return NULL;
-
-    PUT(HDRP(bp), PACK(size, 0));         
-    PUT(FTRP(bp), PACK(size, 0));         
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); 
-    
-    return coalesce(bp); 
 }
 
 /* 
@@ -133,6 +119,56 @@ void *mm_malloc(size_t size)
     return bp;
 }
 
+/*
+ * mm_free - Freeing a block does nothing.
+ * 요청한 블록을 반환한다.
+ */
+void mm_free(void *bp){ 
+    size_t size = GET_SIZE(HDRP(bp)); 
+    PUT(HDRP(bp),PACK(size,0)); 
+    PUT(FTRP(bp), PACK(size,0)); 
+    coalesce(bp);
+}
+
+/*
+ * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
+ */
+void *mm_realloc(void *ptr, size_t size)
+{
+    void *oldptr = ptr;
+    void *newptr;
+    size_t copySize;
+    
+    newptr = mm_malloc(size);
+    if (newptr == NULL)
+      return NULL;
+    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+    if (size < copySize)
+      copySize = size;
+    memcpy(newptr, oldptr, copySize);
+    mm_free(oldptr);
+    return newptr;
+}
+
+/** 서브 함수 **/
+
+/* 요청받은 words만큼 추가 메모리를 요청한다.*/
+static void *extend_heap(size_t words)
+{
+    char *bp;
+
+    size_t size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE; 
+    if ((long)(bp = mem_sbrk(size)) == -1) 
+        return NULL;
+
+    PUT(HDRP(bp), PACK(size, 0));         
+    PUT(FTRP(bp), PACK(size, 0));         
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); 
+    
+    return coalesce(bp); 
+}
+
+
 /* fist fit 방식으로 가용 블록을 탐색한다. */
 static void *first_fit(size_t asize)
 {
@@ -145,15 +181,25 @@ static void *first_fit(size_t asize)
     return NULL;
 }
 
-/*
- * mm_free - Freeing a block does nothing.
- * 요청한 블록을 반환한다.
- */
-void mm_free(void *bp){ 
-    size_t size = GET_SIZE(HDRP(bp)); 
-    PUT(HDRP(bp),PACK(size,0)); 
-    PUT(FTRP(bp), PACK(size,0)); 
-    coalesce(bp);
+/* 찾은 가용 블록에 대해 할당 블록과 가용 블록으로 분할한다. */
+static void place(void *bp, size_t asize)
+{
+    size_t csize = GET_SIZE(HDRP(bp)); // 가용 블록의 사이즈
+
+    if ((csize - asize) >= (2 * DSIZE)) {
+        // asize만큼의 할당 블록을 생성한다.
+        PUT(HDRP(bp), PACK(asize, 1));
+        PUT(FTRP(bp), PACK(asize, 1));
+        bp = NEXT_BLKP(bp);
+        next_heap_listp = bp; // 분할 이후 그 다음 블록
+        // 새로운 할당 블록(전체 가용 블록 - 할당 블록)의 뒷 부분을 가용 블록으로 만든다.
+        PUT(HDRP(bp), PACK(csize - asize, 0));
+        PUT(FTRP(bp), PACK(csize - asize, 0));
+    } else {
+        PUT(HDRP(bp), PACK(csize, 1));
+        PUT(FTRP(bp), PACK(csize, 1));
+        next_heap_listp = NEXT_BLKP(bp); // 분할 이후 그 다음 블록
+    }
 }
 
 /* 인접 가용 블록들을 경계 태그 연결 기술을 사용하여 연결한다. */
@@ -198,37 +244,3 @@ static void *coalesce(void *bp)
     next_heap_listp = bp; 
     return bp;
 }
-
-/*
- * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
- */
-void *mm_realloc(void *ptr, size_t size)
-{
-    void *oldptr = ptr;
-    void *newptr;
-    size_t copySize;
-    
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
