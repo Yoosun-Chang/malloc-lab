@@ -106,7 +106,7 @@ void *mm_malloc(size_t size)
     else 
         asize = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);
 
-    bp = next_fit(asize); // Choice fit-method : first_fit, next_fit, best_fit
+    bp = first_fit(asize); // Choice fit-method : first_fit, next_fit, best_fit
 
     if (bp != NULL) {
         place(bp, asize); 
