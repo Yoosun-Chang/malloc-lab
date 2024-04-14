@@ -58,6 +58,9 @@ team_t team = {
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
 static void *first_fit(size_t asize);
+static void *next_fit(size_t asize);
+static void *best_fit(size_t asize);
+static void place(void *bp, size_t asize);
 
 static char *heap_listp;  
 static char *next_heap_listp;
@@ -66,7 +69,7 @@ static char *next_heap_listp;
 
 /* 
  * mm_init - initialize the malloc package.
- * 최초의 가용블록(4words)을 가지고 힙을 생성하고 할당기를 초기화한다. 
+ * 최초의 가용블록(4words)을 가지고 힙b  을 생성하고 할당기를 초기화한다. 
  */
 int mm_init(void)
 {
@@ -103,7 +106,7 @@ void *mm_malloc(size_t size)
     else 
         asize = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);
 
-    bp = first_fit(asize); // Choice fit-method : first_fit, next_fit, best_fit
+    bp = next_fit(asize); // Choice fit-method : first_fit, next_fit, best_fit
 
     if (bp != NULL) {
         place(bp, asize); 
@@ -117,7 +120,7 @@ void *mm_malloc(size_t size)
     place(bp, asize);
     next_heap_listp = bp;
     return bp;
-}
+} 
 
 /*
  * mm_free - Freeing a block does nothing.
@@ -132,22 +135,29 @@ void mm_free(void *bp){
 
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
+ * 이전에 할당한 메모리의 크기를 재조정한다.
  */
-void *mm_realloc(void *ptr, size_t size)
-{
-    void *oldptr = ptr;
-    void *newptr;
-    size_t copySize;
-    
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
+void *mm_realloc(void *ptr, size_t size) {
+    if (ptr == NULL) {
+        return mm_malloc(size);
+    }
+
+    if (size == 0) {
+        mm_free(ptr);
+        return NULL;
+    }
+
+    size_t old_size =  GET_SIZE(HDRP(ptr)) - DSIZE;
+    size_t copy_size = old_size < size ? old_size : size;
+
+    void *new_ptr = mm_malloc(size);
+    if (new_ptr == NULL)
+        return NULL;
+
+    memcpy(new_ptr, ptr, copy_size);
+    mm_free(ptr);
+
+    return new_ptr;
 }
 
 
@@ -155,7 +165,7 @@ void *mm_realloc(void *ptr, size_t size)
 
 /** 서브 함수 **/
 
-/* 요청받은 words만큼 추가 메모리를 요청한다.*/
+/* 요청받은 words만큼 추가 메모리를 요청한다. */
 static void *extend_heap(size_t words)
 {
     char *bp;
