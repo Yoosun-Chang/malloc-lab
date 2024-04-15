@@ -71,7 +71,7 @@ static char *next_heap_listp;
 
 /* 
  * mm_init - initialize the malloc package.
- * 최초의 가용블록(4words)을 가지고 힙b  을 생성하고 할당기를 초기화한다. 
+ * 최초의 가용블록(4words)을 가지고 힙을 생성하고 할당기를 초기화한다. 
  */
 int mm_init(void)
 {
