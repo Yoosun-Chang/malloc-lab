@@ -30,6 +30,8 @@ team_t team = {
     ""
 };
 
+/* implicit-list */
+
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
 
