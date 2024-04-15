@@ -64,6 +64,7 @@ static void *next_fit(size_t asize);
 static void *best_fit(size_t asize);
 static void place(void *bp, size_t asize);
 
+static char *free_listp;
 static char *heap_listp;  
 static char *next_heap_listp;
 
@@ -71,23 +72,28 @@ static char *next_heap_listp;
 
 /* 
  * mm_init - initialize the malloc package.
- * 최초의 가용블록(4words)을 가지고 힙을 생성하고 할당기를 초기화한다. 
+ * 더미 가용 블록을 초기에 할당한다.
  */
 int mm_init(void)
 {
-    // 1. 초기 빈 힙 생성
-    if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1) 
+    // 초기 힙 생성
+    if ((free_listp = mem_sbrk(8 * WSIZE)) == (void *)-1) // 8워드 크기의 힙 생성, free_listp에 힙의 시작 주소값 할당(가용 블록만 추적)
         return -1;
-    PUT(heap_listp, 0);                             // 정렬을 위한 여백 삽입                           
-    PUT(heap_listp + (1 * WSIZE), PACK(DSIZE, 1));  // 프롤로그 헤더 설정
-    PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1));  // 프롤로그 푸터 설정
-    PUT(heap_listp + (3 * WSIZE), PACK(0, 1));      // 에필로그 헤더 설정
-    
-    heap_listp+= (2*WSIZE); // heap_listp 위치를 프롤로그 헤더 뒤로 옮긴다.
-    next_heap_listp = heap_listp; // next_fit에서 사용하기 위해 초기 포인터 위치를 넣어준다.
+    PUT(free_listp, 0);                                // 정렬 패딩
+    PUT(free_listp + (1 * WSIZE), PACK(2 * WSIZE, 1)); // 프롤로그 Header
+    PUT(free_listp + (2 * WSIZE), PACK(2 * WSIZE, 1)); // 프롤로그 Footer
+    PUT(free_listp + (3 * WSIZE), PACK(4 * WSIZE, 0)); // 첫 가용 블록의 헤더
+    PUT(free_listp + (4 * WSIZE), NULL);               // 이전 가용 블록의 주소
+    PUT(free_listp + (5 * WSIZE), NULL);               // 다음 가용 블록의 주소
+    PUT(free_listp + (6 * WSIZE), PACK(4 * WSIZE, 0)); // 첫 가용 블록의 푸터
+    PUT(free_listp + (7 * WSIZE), PACK(0, 1));         // 에필로그 Header: 프로그램이 할당한 마지막 블록의 뒤에 위치하며, 블록이 할당되지 않은 상태를 나타냄
 
-    if (extend_heap(CHUNKSIZE / WSIZE) == NULL) // 2. 이후 일반 블록을 저장하기 위해 힙을 확장한다.
+    free_listp += (4 * WSIZE); // 첫번째 가용 블록의 bp
+
+    // 힙을 CHUNKSIZE bytes로 확장
+    if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
         return -1;
+
     return 0;
 }
 

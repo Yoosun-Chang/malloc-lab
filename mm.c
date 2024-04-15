@@ -64,6 +64,7 @@ static void *next_fit(size_t asize);
 static void *best_fit(size_t asize);
 static void place(void *bp, size_t asize);
 
+static char *free_listp;
 static char *heap_listp;  
 static char *next_heap_listp;
 
@@ -71,22 +72,27 @@ static char *next_heap_listp;
 
 /* 
  * mm_init - initialize the malloc package.
- * 최초의 가용블록(4words)을 가지고 힙을 생성하고 할당기를 초기화한다. 
+ * 더미 가용 블록을 초기에 할당한다.
  */
 int mm_init(void)
 {
-    if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1) 
+    if ((free_listp = mem_sbrk(8 * WSIZE)) == (void *)-1) 
         return -1;
-    PUT(heap_listp, 0);                            
-    PUT(heap_listp + (1 * WSIZE), PACK(DSIZE, 1)); 
-    PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1)); 
-    PUT(heap_listp + (3 * WSIZE), PACK(0, 1));    
-    
-    heap_listp+= (2*WSIZE);
-    next_heap_listp = heap_listp;
+
+    PUT(free_listp, 0);                                
+    PUT(free_listp + (1 * WSIZE), PACK(2 * WSIZE, 1)); 
+    PUT(free_listp + (2 * WSIZE), PACK(2 * WSIZE, 1)); 
+    PUT(free_listp + (3 * WSIZE), PACK(4 * WSIZE, 0)); 
+    PUT(free_listp + (4 * WSIZE), NULL);             
+    PUT(free_listp + (5 * WSIZE), NULL);               
+    PUT(free_listp + (6 * WSIZE), PACK(4 * WSIZE, 0)); 
+    PUT(free_listp + (7 * WSIZE), PACK(0, 1));         
+
+    free_listp += (4 * WSIZE); 
 
     if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
         return -1;
+
     return 0;
 }
 
