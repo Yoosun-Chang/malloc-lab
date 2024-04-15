@@ -52,6 +52,8 @@ team_t team = {
 #define FTRP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE))) 
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE))) 
+#define GET_SUCC(bp) (*(void **)((char *)(bp) + WSIZE)) 
+#define GET_PRED(bp) (*(void **)(bp))                   
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 /* 전역 영역 선언 */
@@ -62,6 +64,7 @@ static void *next_fit(size_t asize);
 static void *best_fit(size_t asize);
 static void place(void *bp, size_t asize);
 
+static char *free_listp; 
 static char *heap_listp;  
 static char *next_heap_listp;
 

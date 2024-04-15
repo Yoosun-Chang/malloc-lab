@@ -52,6 +52,8 @@ team_t team = {
 #define FTRP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE) // 블록의 푸터 주소를 반환
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE))) // 블록의 다음 블록의 주소를 반환
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE))) // 블록의 이전 블록의 주소를 반환
+#define GET_SUCC(bp) (*(void **)((char *)(bp) + WSIZE)) // 다음 가용 블록의 주소
+#define GET_PRED(bp) (*(void **)(bp))                   // 이전 가용 블록의 주소
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 /* 전역 영역 선언 */
@@ -62,6 +64,7 @@ static void *next_fit(size_t asize);
 static void *best_fit(size_t asize);
 static void place(void *bp, size_t asize);
 
+static char *free_listp; // 가용 리스트의 맨 앞 블록의 bp
 static char *heap_listp;  
 static char *next_heap_listp;
 
@@ -69,7 +72,7 @@ static char *next_heap_listp;
 
 /* 
  * mm_init - initialize the malloc package.
- * 최초의 가용블록(4words)을 가지고 힙b  을 생성하고 할당기를 초기화한다. 
+ * 최초의 가용블록(4words)을 가지고 힙을 생성하고 할당기를 초기화한다. 
  */
 int mm_init(void)
 {
@@ -145,24 +148,23 @@ void mm_free(void *bp){
  * 이전에 할당한 메모리의 크기를 재조정한다.
  */
 void *mm_realloc(void *ptr, size_t size) {
-    if (ptr == NULL) { // 포인터가 NULL인 경우 할당만 수행
+    if (ptr == NULL) {
         return mm_malloc(size);
     }
 
-    if (size == 0) { // size가 0인 경우 메모리 반환만 수행
+    if (size == 0) {
         mm_free(ptr);
         return NULL;
     }
 
-    size_t old_size =  GET_SIZE(HDRP(ptr)) - DSIZE; // payload만큼 복사
-    // 기존 사이즈가 새 크기보다 더 크면 size로 크기 변경 (기존 메모리 블록보다 작은 크기에 할당하면, 일부 데이터만 복사)
+    size_t old_size =  GET_SIZE(HDRP(ptr)) - DSIZE;
     size_t copy_size = old_size < size ? old_size : size;
 
-    void *new_ptr = mm_malloc(size); // 새로 할당한 블록의 포인터
+    void *new_ptr = mm_malloc(size);
     if (new_ptr == NULL)
         return NULL;
 
-    memcpy(new_ptr, ptr, copy_size); // 새 블록으로 데이터 복사
+    memcpy(new_ptr, ptr, copy_size);
     mm_free(ptr);
 
     return new_ptr;
@@ -241,21 +243,19 @@ static void *best_fit(size_t asize)
 /* 찾은 가용 블록에 대해 할당 블록과 가용 블록으로 분할한다. */
 static void place(void *bp, size_t asize)
 {
-    size_t csize = GET_SIZE(HDRP(bp)); // 가용 블록의 사이즈
+    size_t csize = GET_SIZE(HDRP(bp));
 
     if ((csize - asize) >= (2 * DSIZE)) {
-        // asize만큼의 할당 블록을 생성한다.
         PUT(HDRP(bp), PACK(asize, 1));
         PUT(FTRP(bp), PACK(asize, 1));
         bp = NEXT_BLKP(bp);
-        next_heap_listp = bp; // 분할 이후 그 다음 블록
-        // 새로운 할당 블록(전체 가용 블록 - 할당 블록)의 뒷 부분을 가용 블록으로 만든다.
+        next_heap_listp = bp;
         PUT(HDRP(bp), PACK(csize - asize, 0));
         PUT(FTRP(bp), PACK(csize - asize, 0));
     } else {
         PUT(HDRP(bp), PACK(csize, 1));
         PUT(FTRP(bp), PACK(csize, 1));
-        next_heap_listp = NEXT_BLKP(bp); // 분할 이후 그 다음 블록
+        next_heap_listp = NEXT_BLKP(bp);
     }
 }
 
