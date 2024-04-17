@@ -59,9 +59,9 @@ team_t team = {
 /* 전역 영역 선언 */
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
-static void *first_fit(size_t asize);
+//static void *first_fit(size_t asize);
 static void *next_fit(size_t asize);
-static void *best_fit(size_t asize);
+//static void *best_fit(size_t asize);
 static void place(void *bp, size_t asize);
 
 static char *heap_listp;  
@@ -185,6 +185,7 @@ static void *extend_heap(size_t words)
 
 
 /* fist fit 방식으로 가용 블록을 탐색한다. */
+/*
 static void *first_fit(size_t asize)
 {
     void *bp;
@@ -195,6 +196,7 @@ static void *first_fit(size_t asize)
 
     return NULL;
 }
+*/
 
 /* next fit 방식으로 가용 블록을 탐색한다. */
 static void *next_fit(size_t asize)
@@ -213,6 +215,7 @@ static void *next_fit(size_t asize)
 }
 
 /* best-fit 방식으로 가용 블록을 탐색한다. */
+/*
 static void *best_fit(size_t asize)
 {
     void *bp;
@@ -225,6 +228,7 @@ static void *best_fit(size_t asize)
 
     return best_fit;
 }
+*/
 
 /* 찾은 가용 블록에 대해 할당 블록과 가용 블록으로 분할한다. */
 static void place(void *bp, size_t asize)
@@ -252,22 +256,19 @@ static void *coalesce(void *bp)
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp))); 
     size_t size = GET_SIZE(HDRP(bp)); 
 
-    // @pb : 이전 블록, @cb : 현재 블록, @nb : 다음 블록
-    // [CASE 1] : pb, nb - 둘 다 할당 상태
+    // [CASE 1]
     if (prev_alloc && next_alloc)
     {
         return bp;
     }
-    // [CASE 2] : pb - 할당 상태 / nb - 가용 상태
-    // resize block size : cb + nb
+    // [CASE 2]
     else if (prev_alloc && !next_alloc)
     {
-        size += GET_SIZE(HDRP(NEXT_BLKP(bp))); // 현재 블록 사이즈에 다음 블록 사이즈 더함
+        size += GET_SIZE(HDRP(NEXT_BLKP(bp))); 
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
     }
-    // [CASE 3] : pb - 가용 상태 / nb - 할당 상태
-    // resize block size : pb + cb
+    // [CASE 3]
     else if (!prev_alloc && next_alloc)
     {
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
@@ -275,8 +276,7 @@ static void *coalesce(void *bp)
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
     }
-    // [CASE 4] : pb - 가용 상태 / nb - 가용 상태
-    // resize block size : pb + nb
+    // [CASE 4]
     else {
         size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
             GET_SIZE(FTRP(NEXT_BLKP(bp)));
