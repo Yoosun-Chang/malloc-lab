@@ -139,29 +139,31 @@ void mm_free(void *bp){
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  * 이전에 할당한 메모리의 크기를 재조정한다.
  */
-void *mm_realloc(void *ptr, size_t size) {
-    if (ptr == NULL) {
-        return mm_malloc(size);
+void *mm_realloc(void *bp, size_t size) {
+    size_t old_size = GET_SIZE(HDRP(bp));
+    size_t new_size = size + (2 * WSIZE);  
+
+    if (new_size <= old_size) {
+        return bp;
     }
+    else {
+        size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+        size_t current_size = old_size + GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
-    if (size == 0) {
-        mm_free(ptr);
-        return NULL;
+        if (!next_alloc && current_size >= new_size) {
+            PUT(HDRP(bp), PACK(current_size, 1));
+            PUT(FTRP(bp), PACK(current_size, 1));
+            return bp;
+        }
+        else {
+            void *new_bp = mm_malloc(new_size);
+            place(new_bp, new_size);
+            memcpy(new_bp, bp, new_size); 
+            mm_free(bp);
+            return new_bp;
+        }
     }
-
-    size_t old_size =  GET_SIZE(HDRP(ptr)) - DSIZE;
-    size_t copy_size = old_size < size ? old_size : size;
-
-    void *new_ptr = mm_malloc(size);
-    if (new_ptr == NULL)
-        return NULL;
-
-    memcpy(new_ptr, ptr, copy_size);
-    mm_free(ptr);
-
-    return new_ptr;
 }
-
 
 
 
